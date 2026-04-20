@@ -29,42 +29,6 @@ See:
 * [Kafka protocol guide](http://kafka.apache.org/protocol.html)
 
 
-### Supported Kafka versions
-Following table provides overview of supported Kafka versions (specified one and all previous Kafka versions).
-As not every Kafka release adds new messages/versions which are relevant to the Kafka proxy, newer Kafka versions can also work.
-
-
-| Kafka proxy version | Kafka version |
-|---------------------|---------------|
-|                     | from 0.11.0   |
-| 0.2.9               | to 2.8.0      |
-| 0.3.1               | to 3.4.0      |
-| 0.3.11              | to 3.7.0      |
-| 0.3.12              | to 3.9.0      |
-| 0.4.2               | to 4.0.0      |
-
-### Install binary release
-
-1. Download the latest release
-
-   Linux
-
-        curl -Ls https://github.com/grepplabs/kafka-proxy/releases/download/v0.4.3/kafka-proxy-v0.4.3-linux-amd64.tar.gz | tar xz
-
-   macOS
-
-        curl -Ls https://github.com/grepplabs/kafka-proxy/releases/download/v0.4.3/kafka-proxy-v0.4.3-darwin-amd64.tar.gz | tar xz
-
-2. Move the binary in to your PATH.
-
-    ```
-    sudo mv ./kafka-proxy /usr/local/bin/kafka-proxy
-    ```
-
-### Building
-
-    make clean build
-
 ### Docker images
 
 Docker images are available on [Docker Hub](https://hub.docker.com/r/grepplabs/kafka-proxy/tags).
