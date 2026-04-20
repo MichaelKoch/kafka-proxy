@@ -39,7 +39,7 @@ RUN chmod +x /opt/kafka-proxy/bin/docker-entrypoint.sh && \
     mkdir -p /run/nginx && \
     rm -f /etc/nginx/http.d/default.conf
 
-# Environment variable defaults
+# Environment variable defaults (secrets are passed at runtime via --env-file)
 ENV KAFKA_PROXY_BOOTSTRAP_SERVERS="" \
     KAFKA_PROXY_DEFAULT_LISTENER_IP="0.0.0.0" \
     KAFKA_PROXY_HTTP_LISTEN_ADDRESS="0.0.0.0:8000" \
@@ -51,12 +51,8 @@ ENV KAFKA_PROXY_BOOTSTRAP_SERVERS="" \
     KAFKA_PROXY_TLS_INSECURE_SKIP_VERIFY="true" \
     KAFKA_PROXY_SASL_ENABLE="true" \
     KAFKA_PROXY_SASL_METHOD="PLAIN" \
-    KAFKA_PROXY_SASL_USERNAME="" \
-    KAFKA_PROXY_SASL_PASSWORD="" \
     KAFKA_PROXY_LISTENER_TLS_ENABLE="false" \
-    SCHEMA_REGISTRY_UPSTREAM="" \
-    SCHEMA_REGISTRY_API_KEY="" \
-    SCHEMA_REGISTRY_API_SECRET=""
+    SCHEMA_REGISTRY_UPSTREAM=""
 
 EXPOSE 9092 8000 8081
 
