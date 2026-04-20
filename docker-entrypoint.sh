@@ -25,7 +25,8 @@ if [ -z "$KAFKA_PROXY_BOOTSTRAP_SERVERS" ]; then
 fi
 
 ARGS="server"
-ARGS="$ARGS --bootstrap-server-mapping=${KAFKA_PROXY_BOOTSTRAP_SERVERS},${KAFKA_PROXY_DEFAULT_LISTENER_IP}:9092"
+LISTENER_PORT="${KAFKA_PROXY_LISTENER_PORT:-9092}"
+ARGS="$ARGS --bootstrap-server-mapping=${KAFKA_PROXY_BOOTSTRAP_SERVERS},${KAFKA_PROXY_DEFAULT_LISTENER_IP}:${LISTENER_PORT}"
 
 # HTTP
 [ -n "$KAFKA_PROXY_HTTP_LISTEN_ADDRESS" ] && ARGS="$ARGS --http-listen-address=${KAFKA_PROXY_HTTP_LISTEN_ADDRESS}"
@@ -48,6 +49,17 @@ ARGS="$ARGS --bootstrap-server-mapping=${KAFKA_PROXY_BOOTSTRAP_SERVERS},${KAFKA_
 [ -n "$KAFKA_PROXY_SASL_METHOD" ]       && ARGS="$ARGS --sasl-method=${KAFKA_PROXY_SASL_METHOD}"
 [ -n "$KAFKA_PROXY_SASL_USERNAME" ]     && ARGS="$ARGS --sasl-username=${KAFKA_PROXY_SASL_USERNAME}"
 [ -n "$KAFKA_PROXY_SASL_PASSWORD" ]     && ARGS="$ARGS --sasl-password=${KAFKA_PROXY_SASL_PASSWORD}"
+
+# Dynamic listener ports
+[ -n "$KAFKA_PROXY_DYNAMIC_SEQUENTIAL_MIN_PORT" ] && ARGS="$ARGS --dynamic-sequential-min-port=${KAFKA_PROXY_DYNAMIC_SEQUENTIAL_MIN_PORT}"
+[ -n "$KAFKA_PROXY_DYNAMIC_SEQUENTIAL_MAX_PORTS" ] && ARGS="$ARGS --dynamic-sequential-max-ports=${KAFKA_PROXY_DYNAMIC_SEQUENTIAL_MAX_PORTS}"
+
+# Dial address mapping (redirect broker addresses, e.g. for K8s)
+if [ -n "$KAFKA_PROXY_DIAL_ADDRESS_MAPPING" ]; then
+    for mapping in $KAFKA_PROXY_DIAL_ADDRESS_MAPPING; do
+        ARGS="$ARGS --dial-address-mapping=${mapping}"
+    done
+fi
 
 echo "Starting kafka-proxy -> ${KAFKA_PROXY_BOOTSTRAP_SERVERS}"
 exec $PROXY_BIN $ARGS
