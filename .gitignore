@@ -4,7 +4,7 @@ build/
 /google-id-info
 /google-id-provider
 /.tools
-
+**/.env
 # goreleaser
 dist/
 
