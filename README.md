@@ -69,6 +69,56 @@ As not every Kafka release adds new messages/versions which are relevant to the 
 
 Docker images are available on [Docker Hub](https://hub.docker.com/r/grepplabs/kafka-proxy/tags).
 
+For the Docker image defined in this repository (`Dockerfile`), build and run:
+
+```bash
+docker build --build-arg VERSION=$(git describe --tags --always --dirty) -t local/kafka-proxy .
+docker run --rm --name kafka-proxy --network host --env-file .env local/kafka-proxy
+```
+
+The `.env` file should contain at least:
+
+```bash
+KAFKA_PROXY_BOOTSTRAP_SERVERS=<kafka-bootstrap-host:port>
+KAFKA_PROXY_SASL_USERNAME=<api-key>
+KAFKA_PROXY_SASL_PASSWORD=<api-secret>
+```
+
+Optional Schema Registry proxy settings:
+
+```bash
+SCHEMA_REGISTRY_UPSTREAM=https://<schema-registry-host>
+SCHEMA_REGISTRY_API_KEY=<schema-registry-api-key>
+SCHEMA_REGISTRY_API_SECRET=<schema-registry-api-secret>
+```
+
+With this image:
+- Kafka is exposed on `localhost:9092`
+- Health and metrics are exposed on `localhost:8000` (`/health`, `/metrics`)
+- Schema Registry is exposed on `localhost:8081` when `SCHEMA_REGISTRY_*` is configured
+
+#### Container skill file (capabilities)
+
+The container ships with `/opt/kafka-proxy/CONTAINER_SKILL.md`, which documents exposed endpoints, environment variables and common commands.
+
+Fetch capabilities from a running container:
+
+```bash
+docker exec kafka-proxy cat /opt/kafka-proxy/CONTAINER_SKILL.md
+```
+
+#### Included tools in the Docker image
+
+The image includes the following tools:
+- `kcat`
+- `kafka-topics.sh`
+- `kafka-console-producer.sh`
+- `kafka-console-consumer.sh`
+- `kafka-consumer-groups.sh`
+- `curl`
+- `wget`
+- `java` (OpenJDK 17 runtime)
+
 You can launch a kafka-proxy container for trying it out with
 
     docker run --rm -p 30001-30003:30001-30003 grepplabs/kafka-proxy:0.4.3 \
