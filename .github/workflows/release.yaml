@@ -32,7 +32,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            grepplabs/kafka-proxy
+            michaelkoch/kproxy
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -45,7 +45,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            grepplabs/kafka-proxy
+            michaelkoch/kproxy
           flavor: |
             suffix=-all
           tags: |

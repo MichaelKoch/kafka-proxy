@@ -1,0 +1,17 @@
+server {
+    listen 8081;
+    server_name localhost;
+
+    location / {
+        proxy_pass ${SCHEMA_REGISTRY_UPSTREAM};
+        proxy_ssl_server_name on;
+
+        proxy_set_header Host $SCHEMA_REGISTRY_HOST;
+        proxy_set_header Authorization "Basic ${SCHEMA_REGISTRY_BASIC_AUTH}";
+        proxy_set_header Content-Type $content_type;
+        proxy_set_header Accept $http_accept;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+    }
+}
