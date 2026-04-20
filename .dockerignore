@@ -1,0 +1,15 @@
+.env
+.git
+.github
+.gitignore
+.idea
+build/
+dist/
+vendor/
+*.test
+*.out
+*.prof
+LICENSE
+README.md
+Makefile
+test-proxy.sh
