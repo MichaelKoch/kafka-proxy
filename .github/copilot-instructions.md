@@ -13,7 +13,8 @@ and exposes plaintext Kafka and Schema Registry endpoints locally.
 
 The Docker container runs a Kafka proxy and an nginx-based Schema Registry reverse proxy.
 Clients connect via plaintext — TLS/SASL authentication is handled by the proxy.
-
+Below compact documentation describes the services, endpoints, CLI tools, and environment variables for the Kafka proxy container.
+For more details, see the  SKILL.md on the container filesystem
 ### Services
 
 | Service               | Port | Protocol  | Description                                      |

@@ -34,7 +34,7 @@ RUN setcap 'cap_net_bind_service=+ep' /opt/kafka-proxy/bin/kafka-proxy
 # Nginx Schema Registry proxy template
 COPY nginx-schema-registry.conf.template /etc/nginx/templates/schema-registry.conf.template
 COPY docker-entrypoint.sh /opt/kafka-proxy/bin/docker-entrypoint.sh
-COPY CONTAINER_SKILL.md /opt/kafka-proxy/CONTAINER_SKILL.md
+COPY SKILL.md /opt/kafka-proxy/SKILL.md
 RUN chmod +x /opt/kafka-proxy/bin/docker-entrypoint.sh && \
     mkdir -p /run/nginx && \
     rm -f /etc/nginx/http.d/default.conf
