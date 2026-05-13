@@ -7,7 +7,9 @@ server {
         proxy_ssl_server_name on;
 
         proxy_set_header Host $SCHEMA_REGISTRY_HOST;
-        proxy_set_header Authorization "Basic ${SCHEMA_REGISTRY_BASIC_AUTH}";
+        proxy_set_header Authorization "${SCHEMA_REGISTRY_AUTH_HEADER}";
+        proxy_set_header target-sr-cluster "${SCHEMA_REGISTRY_LOGICAL_CLUSTER}";
+        proxy_set_header Confluent-Identity-Pool-Id "${SCHEMA_REGISTRY_IDENTITY_POOL_ID}";
         proxy_set_header Content-Type $content_type;
         proxy_set_header Accept $http_accept;
 

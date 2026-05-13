@@ -10,6 +10,10 @@ import (
 	"golang.org/x/oauth2/clientcredentials"
 )
 
+type grantTypePayload struct {
+	Name string `json:"grant_type"`
+}
+
 type ServiceAccountTokenSource struct {
 	// ClientID is the application's ID.
 	ClientID string `json:"client_id"`
@@ -40,6 +44,20 @@ func NewServiceAccountTokenSource(credentialsFile string, targetAudience string)
 	}
 
 	return source, nil
+}
+
+func GetGrantType(credentialsFile string) (string, error) {
+	data, err := os.ReadFile(credentialsFile)
+	if err != nil {
+		return "", err
+	}
+
+	payload := &grantTypePayload{}
+	if err := json.Unmarshal(data, payload); err != nil {
+		return "", err
+	}
+
+	return payload.Name, nil
 }
 
 // GetIDToken - retrieve token from endpoint

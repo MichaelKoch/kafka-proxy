@@ -12,7 +12,8 @@ WORKDIR /go/src/github.com/grepplabs/kafka-proxy
 COPY . .
 
 RUN mkdir -p build && \
-    go build -mod=vendor -o build/kafka-proxy -ldflags "${LDFLAGS}" .
+    go build -mod=vendor -o build/kafka-proxy -ldflags "${LDFLAGS}" . && \
+    go build -mod=vendor -o build/oidc-provider -ldflags "${LDFLAGS}" cmd/plugin-oidc-provider/main.go
 
 FROM alpine:3.21
 
@@ -29,7 +30,8 @@ RUN wget -q "https://downloads.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_V
 ENV PATH="/opt/kafka/bin:${PATH}"
 
 COPY --from=builder /go/src/github.com/grepplabs/kafka-proxy/build /opt/kafka-proxy/bin
-RUN setcap 'cap_net_bind_service=+ep' /opt/kafka-proxy/bin/kafka-proxy
+RUN setcap 'cap_net_bind_service=+ep' /opt/kafka-proxy/bin/kafka-proxy && \
+    setcap 'cap_net_bind_service=+ep' /opt/kafka-proxy/bin/oidc-provider
 
 # Nginx Schema Registry proxy template
 COPY nginx-schema-registry.conf.template /etc/nginx/templates/schema-registry.conf.template

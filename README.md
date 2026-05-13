@@ -40,13 +40,32 @@ The entrypoint script (`docker-entrypoint.sh`) reads environment variables and t
 into the appropriate `kafka-proxy server` CLI flags. If Schema Registry variables are set,
 an nginx reverse proxy is started automatically on port 8081.
 
-**1. Create a `.env` file** with the required Kafka connection settings:
+**1. Create a `.env` file** with the required Kafka connection settings.
+
+For Confluent Cloud API key/secret (SASL/PLAIN):
 
 ```bash
 # Required
 KAFKA_PROXY_BOOTSTRAP_SERVERS=pkc-xxxxx.eu-central-1.aws.confluent.cloud:9092
 KAFKA_PROXY_SASL_USERNAME=<api-key>
 KAFKA_PROXY_SASL_PASSWORD=<api-secret>
+```
+
+For OIDC/OAUTHBEARER (for example Entra ID, no credentials file required):
+
+```bash
+KAFKA_PROXY_BOOTSTRAP_SERVERS=pkc-xxxxx.eu-central-1.aws.confluent.cloud:9092
+KAFKA_PROXY_SASL_ENABLE=true
+KAFKA_PROXY_SASL_PLUGIN_ENABLE=true
+KAFKA_PROXY_SASL_PLUGIN_COMMAND=/opt/kafka-proxy/bin/oidc-provider
+KAFKA_PROXY_SASL_PLUGIN_MECHANISM=OAUTHBEARER
+KAFKA_PROXY_SASL_OIDC_GRANT_TYPE=client_credentials
+KAFKA_PROXY_SASL_OIDC_CLIENT_ID=<client-id>
+KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET=<client-secret>
+KAFKA_PROXY_SASL_OIDC_TOKEN_URL=https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+KAFKA_PROXY_SASL_OIDC_SCOPES=api://<resource-app-id>/.default
+KAFKA_PROXY_SASL_OAUTH_LOGICAL_CLUSTER=<lkc-...>
+KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID=<pool-...>
 ```
 
 **2. Start the container** using `--env-file`:
@@ -71,10 +90,20 @@ kcat -b localhost:9092 -L               # list topics
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `KAFKA_PROXY_BOOTSTRAP_SERVERS` | **yes** | — | Upstream Kafka broker address (`host:port`) |
-| `KAFKA_PROXY_SASL_USERNAME` | **yes** | — | SASL username (API key) for upstream Kafka |
-| `KAFKA_PROXY_SASL_PASSWORD` | **yes** | — | SASL password (API secret) for upstream Kafka |
+| `KAFKA_PROXY_SASL_USERNAME` | no | — | SASL username (API key) for `SASL/PLAIN` |
+| `KAFKA_PROXY_SASL_PASSWORD` | no | — | SASL password (API secret) for `SASL/PLAIN` |
 | `KAFKA_PROXY_SASL_ENABLE` | no | `true` | Set to `false` to disable SASL authentication |
 | `KAFKA_PROXY_SASL_METHOD` | no | `PLAIN` | SASL method (`PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`, etc.) |
+| `KAFKA_PROXY_SASL_PLUGIN_ENABLE` | no | `false` | Enable plugin-based SASL authentication |
+| `KAFKA_PROXY_SASL_PLUGIN_COMMAND` | no | — | Plugin binary path (for OIDC: `/opt/kafka-proxy/bin/oidc-provider`) |
+| `KAFKA_PROXY_SASL_PLUGIN_MECHANISM` | no | `OAUTHBEARER` | SASL plugin mechanism |
+| `KAFKA_PROXY_SASL_OIDC_GRANT_TYPE` | no | `client_credentials` | OIDC grant type for `oidc-provider` (`client_credentials` or `password`) |
+| `KAFKA_PROXY_SASL_OIDC_CLIENT_ID` | no | — | OIDC client ID (when not using credentials file) |
+| `KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET` | no | — | OIDC client secret (when not using credentials file) |
+| `KAFKA_PROXY_SASL_OIDC_TOKEN_URL` | no | — | OIDC token endpoint URL |
+| `KAFKA_PROXY_SASL_OIDC_SCOPES` | no | — | Comma-separated OIDC scopes |
+| `KAFKA_PROXY_SASL_OAUTH_LOGICAL_CLUSTER` | no | — | Kafka logical cluster extension (`logicalCluster`, usually `lkc-...`) |
+| `KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID` | no | — | Kafka identity pool extension (`identityPoolId`, usually `pool-...`) |
 | `KAFKA_PROXY_TLS_ENABLE` | no | — | Set to `true` to enable TLS to upstream broker |
 | `KAFKA_PROXY_TLS_INSECURE_SKIP_VERIFY` | no | — | Set to `true` to skip TLS certificate verification |
 | `KAFKA_PROXY_LISTENER_TLS_ENABLE` | no | — | Set to `true` to enable TLS on the proxy listener |
@@ -84,6 +113,9 @@ kcat -b localhost:9092 -L               # list topics
 | `KAFKA_PROXY_HTTP_HEALTH_PATH` | no | `/health` | Health endpoint path |
 | `KAFKA_PROXY_HTTP_METRICS_PATH` | no | `/metrics` | Prometheus metrics endpoint path |
 | `SCHEMA_REGISTRY_UPSTREAM` | no | — | Schema Registry URL (enables nginx proxy on :8081) |
+| `SCHEMA_REGISTRY_OIDC_SCOPES` | no | falls back to `KAFKA_PROXY_SASL_OIDC_SCOPES` | OIDC scopes used for Schema Registry token acquisition |
+| `SCHEMA_REGISTRY_LOGICAL_CLUSTER` | no | falls back to `KAFKA_PROXY_SASL_OAUTH_LOGICAL_CLUSTER` | Schema Registry logical cluster header (`target-sr-cluster`, should be `lsrc-...` or `lscc-...`) |
+| `SCHEMA_REGISTRY_IDENTITY_POOL_ID` | no | falls back to `KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID` | Schema Registry identity pool header (`Confluent-Identity-Pool-Id`) |
 | `SCHEMA_REGISTRY_API_KEY` | no | — | Schema Registry API key |
 | `SCHEMA_REGISTRY_API_SECRET` | no | — | Schema Registry API secret |
 
@@ -92,13 +124,29 @@ kcat -b localhost:9092 -L               # list topics
 ```bash
 # Kafka connection (required)
 KAFKA_PROXY_BOOTSTRAP_SERVERS=pkc-xxxxx.eu-central-1.aws.confluent.cloud:9092
-KAFKA_PROXY_SASL_USERNAME=ABCDEFGHIJKLMNOP
-KAFKA_PROXY_SASL_PASSWORD=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# Kafka auth via OIDC plugin (no credentials file)
+KAFKA_PROXY_SASL_ENABLE=true
+KAFKA_PROXY_SASL_PLUGIN_ENABLE=true
+KAFKA_PROXY_SASL_PLUGIN_COMMAND=/opt/kafka-proxy/bin/oidc-provider
+KAFKA_PROXY_SASL_PLUGIN_MECHANISM=OAUTHBEARER
+KAFKA_PROXY_SASL_OIDC_GRANT_TYPE=client_credentials
+KAFKA_PROXY_SASL_OIDC_CLIENT_ID=<client-id>
+KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET=<client-secret>
+KAFKA_PROXY_SASL_OIDC_TOKEN_URL=https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+KAFKA_PROXY_SASL_OIDC_SCOPES=api://<resource-app-id>/.default
+KAFKA_PROXY_SASL_OAUTH_LOGICAL_CLUSTER=<lkc-...>
+KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID=<pool-...>
 
 # Schema Registry (optional — enables nginx reverse proxy on :8081)
 SCHEMA_REGISTRY_UPSTREAM=https://psrc-xxxxx.eu-central-1.aws.confluent.cloud
-SCHEMA_REGISTRY_API_KEY=QRSTUVWXYZ123456
-SCHEMA_REGISTRY_API_SECRET=yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+SCHEMA_REGISTRY_LOGICAL_CLUSTER=<lsrc-...>
+# Optional override, defaults to KAFKA_PROXY_SASL_OIDC_SCOPES
+SCHEMA_REGISTRY_OIDC_SCOPES=api://<resource-app-id>/.default
+
+# Alternative Schema Registry auth mode (Basic)
+# SCHEMA_REGISTRY_API_KEY=...
+# SCHEMA_REGISTRY_API_SECRET=...
 
 # Optional tuning
 KAFKA_PROXY_LOG_LEVEL=info

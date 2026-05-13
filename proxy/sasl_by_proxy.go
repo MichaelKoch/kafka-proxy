@@ -39,6 +39,7 @@ type SASLOAuthBearerAuth struct {
 	readTimeout  time.Duration
 
 	tokenProvider apis.TokenProvider
+	extensions    map[string]string
 }
 
 type SASLPlainAuth struct {
@@ -210,7 +211,7 @@ func (b *SASLOAuthBearerAuth) sendAndReceiveSASLAuth(conn DeadlineReaderWriter, 
 func (b *SASLOAuthBearerAuth) sendSaslAuthenticateRequest(token string, conn DeadlineReaderWriter) error {
 	logrus.Debugf("Sending SaslAuthenticateRequest, mechanism OAUTHBEARER")
 
-	saslAuthReqV0 := protocol.SaslAuthenticateRequestV0{SaslAuthBytes: SaslOAuthBearer{}.ToBytes(token, "", make(map[string]string, 0))}
+	saslAuthReqV0 := protocol.SaslAuthenticateRequestV0{SaslAuthBytes: SaslOAuthBearer{}.ToBytes(token, "", b.extensions)}
 
 	req := &protocol.Request{
 		ClientID: b.clientID,

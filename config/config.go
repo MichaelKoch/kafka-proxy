@@ -166,6 +166,10 @@ type Config struct {
 			Password       string
 			JaasConfigFile string
 			Method         string
+			OAuth struct {
+				LogicalCluster string
+				IdentityPoolID string
+			}
 			Plugin         struct {
 				Enable     bool
 				Command    string

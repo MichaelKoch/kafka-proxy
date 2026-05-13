@@ -92,11 +92,19 @@ func NewClient(conns *ConnSet, c *config.Config, netAddressMappingFunc config.Ne
 	var saslAuthByProxy SASLAuthByProxy
 	if c.Kafka.SASL.Plugin.Enable {
 		if c.Kafka.SASL.Plugin.Mechanism == SASLOAuthBearer && saslTokenProvider != nil {
+			oauthExtensions := make(map[string]string)
+			if c.Kafka.SASL.OAuth.LogicalCluster != "" {
+				oauthExtensions["logicalCluster"] = c.Kafka.SASL.OAuth.LogicalCluster
+			}
+			if c.Kafka.SASL.OAuth.IdentityPoolID != "" {
+				oauthExtensions["identityPoolId"] = c.Kafka.SASL.OAuth.IdentityPoolID
+			}
 			saslAuthByProxy = &SASLOAuthBearerAuth{
 				clientID:      c.Kafka.ClientID,
 				writeTimeout:  c.Kafka.WriteTimeout,
 				readTimeout:   c.Kafka.ReadTimeout,
 				tokenProvider: saslTokenProvider,
+				extensions:    oauthExtensions,
 			}
 		} else {
 			return nil, errors.Errorf("SASLAuthByProxy plugin unsupported or plugin misconfiguration for mechanism '%s' ", c.Kafka.SASL.Plugin.Mechanism)

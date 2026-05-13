@@ -81,14 +81,27 @@ curl -s http://localhost:8000/health
 | Variable                          | Required | Default       | Description                                |
 |-----------------------------------|----------|---------------|--------------------------------------------|
 | KAFKA_PROXY_BOOTSTRAP_SERVERS     | yes      |               | Upstream Kafka broker address              |
-| KAFKA_PROXY_SASL_USERNAME         | yes      |               | SASL username for upstream Kafka           |
-| KAFKA_PROXY_SASL_PASSWORD         | yes      |               | SASL password for upstream Kafka           |
+| KAFKA_PROXY_SASL_USERNAME         | no       |               | SASL username for upstream Kafka (`PLAIN`) |
+| KAFKA_PROXY_SASL_PASSWORD         | no       |               | SASL password for upstream Kafka (`PLAIN`) |
 | KAFKA_PROXY_DEFAULT_LISTENER_IP   | no       | 0.0.0.0       | IP to bind the proxy listener              |
 | KAFKA_PROXY_TLS_ENABLE            | no       | true          | Enable TLS to upstream broker              |
 | KAFKA_PROXY_SASL_ENABLE           | no       | true          | Enable SASL auth to upstream broker        |
 | KAFKA_PROXY_SASL_METHOD           | no       | PLAIN         | SASL method (PLAIN, SCRAM-SHA-256, etc.)   |
+| KAFKA_PROXY_SASL_PLUGIN_ENABLE    | no       | false         | Enable plugin-based SASL auth              |
+| KAFKA_PROXY_SASL_PLUGIN_COMMAND   | no       |               | Plugin binary path, e.g. /opt/kafka-proxy/bin/oidc-provider |
+| KAFKA_PROXY_SASL_PLUGIN_MECHANISM | no       | OAUTHBEARER   | SASL plugin mechanism                      |
+| KAFKA_PROXY_SASL_OIDC_GRANT_TYPE  | no       | client_credentials | OIDC grant type for oidc-provider      |
+| KAFKA_PROXY_SASL_OIDC_CLIENT_ID   | no       |               | OIDC client ID                             |
+| KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET | no     |               | OIDC client secret                         |
+| KAFKA_PROXY_SASL_OIDC_TOKEN_URL   | no       |               | OIDC token endpoint URL                    |
+| KAFKA_PROXY_SASL_OIDC_SCOPES      | no       |               | Comma-separated OIDC scopes                |
+| KAFKA_PROXY_SASL_OAUTH_LOGICAL_CLUSTER | no   |               | Kafka logical cluster extension (`lkc-...`) |
+| KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID | no |               | Kafka identity pool extension (`pool-...`) |
 | KAFKA_PROXY_LOG_LEVEL             | no       | info          | Log level (debug, info, warn, error)       |
 | SCHEMA_REGISTRY_UPSTREAM          | no       |               | Schema Registry URL (enables nginx proxy)  |
+| SCHEMA_REGISTRY_OIDC_SCOPES       | no       |               | OIDC scopes for Schema Registry token      |
+| SCHEMA_REGISTRY_LOGICAL_CLUSTER   | no       |               | Schema Registry logical cluster header (`lsrc-...`/`lscc-...`) |
+| SCHEMA_REGISTRY_IDENTITY_POOL_ID  | no       |               | Schema Registry identity pool header        |
 | SCHEMA_REGISTRY_API_KEY           | no       |               | Schema Registry API key                    |
 | SCHEMA_REGISTRY_API_SECRET        | no       |               | Schema Registry API secret                 |
 

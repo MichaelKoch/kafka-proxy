@@ -174,6 +174,8 @@ func initFlags() {
 	Server.Flags().StringVar(&c.Kafka.SASL.Password, "sasl-password", os.Getenv("SASL_PASSWORD"), "SASL user password")
 	Server.Flags().StringVar(&c.Kafka.SASL.JaasConfigFile, "sasl-jaas-config-file", "", "Location of JAAS config file with SASL username and password")
 	Server.Flags().StringVar(&c.Kafka.SASL.Method, "sasl-method", "PLAIN", "SASL method to use (PLAIN, SCRAM-SHA-256, SCRAM-SHA-512, GSSAPI, AWS_MSK_IAM")
+	Server.Flags().StringVar(&c.Kafka.SASL.OAuth.LogicalCluster, "sasl-oauth-logical-cluster", "", "SASL OAUTHBEARER extension logicalCluster value")
+	Server.Flags().StringVar(&c.Kafka.SASL.OAuth.IdentityPoolID, "sasl-oauth-identity-pool-id", "", "SASL OAUTHBEARER extension identityPoolId value")
 
 	// SASL GSSAPI
 	Server.Flags().StringVar(&c.Kafka.SASL.GSSAPI.AuthType, "gssapi-auth-type", config.KRB5_KEYTAB_AUTH, "GSSAPI auth type: KEYTAB or USER")

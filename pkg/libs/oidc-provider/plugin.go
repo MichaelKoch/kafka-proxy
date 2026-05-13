@@ -2,9 +2,9 @@ package oidcprovider
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -43,29 +43,35 @@ type TokenProviderOptions struct {
 	CredentialsWatch bool
 	CredentialsFile  string
 	TargetAudience   string
-}
 
-type GrantType struct {
-	Name string `json:"grant_type"`
+	GrantType    string
+	ClientID     string
+	ClientSecret string
+	TokenURL     string
+	Scopes       []string
+	Username     string
+	Password     string
 }
 
 // NewTokenProvider - Generate new OIDC token provider
 func NewTokenProvider(options TokenProviderOptions) (*TokenProvider, error) {
-	os.Setenv("OIDC_CREDENTIALS", options.CredentialsFile)
+	if options.CredentialsFile != "" {
+		os.Setenv("OIDC_CREDENTIALS", options.CredentialsFile)
+	}
 	stopChannel := make(chan bool, 1)
 	var idTokenSource idTokenSource
 
-	idTokenSource, err := getTokenSource(options.CredentialsFile, options.TargetAudience)
+	idTokenSource, err := getTokenSource(options)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if options.CredentialsWatch {
+	if options.CredentialsFile != "" && options.CredentialsWatch {
 		action := func() {
 			logrus.Infof("reloading credential file %s", options.CredentialsFile)
 
-			idTokenSource, err = getTokenSource(options.CredentialsFile, options.TargetAudience)
+			idTokenSource, err = getTokenSource(options)
 
 			if err != nil {
 				logrus.Errorf("error while reloading credentials files: %s", err)
@@ -203,26 +209,47 @@ func getTokenResponse(token string, status int) (apis.TokenResponse, error) {
 	return apis.TokenResponse{Success: success, Status: int32(status), Token: token}, nil
 }
 
-func getTokenSource(credentialsFilePath string, targetAud string) (idTokenSource, error) {
-	data, err := os.ReadFile(credentialsFilePath)
+func getTokenSource(options TokenProviderOptions) (idTokenSource, error) {
+	if options.CredentialsFile == "" {
+		if options.ClientID == "" || options.ClientSecret == "" || options.TokenURL == "" {
+			return nil, errors.New("client-id, client-secret and token-url are required when credentials-file is not provided")
+		}
 
+		switch strings.ToLower(strings.TrimSpace(options.GrantType)) {
+		case "password":
+			if options.Username == "" || options.Password == "" {
+				return nil, errors.New("username and password are required for grant-type=password")
+			}
+			source := &oidc.PasswordGrantTokenSource{
+				ClientID:     options.ClientID,
+				ClientSecret: options.ClientSecret,
+				Username:     options.Username,
+				Password:     options.Password,
+				TokenURL:     options.TokenURL,
+				Scopes:       options.Scopes,
+			}
+			return &passwordGrantSource{source: source}, nil
+		default:
+			source := &oidc.ServiceAccountTokenSource{
+				ClientID:     options.ClientID,
+				ClientSecret: options.ClientSecret,
+				TokenURL:     options.TokenURL,
+				Scopes:       options.Scopes,
+			}
+			return &serviceAccountSource{source: source}, nil
+		}
+	}
+
+	grantType, err := oidc.GetGrantType(options.CredentialsFile)
 	if err != nil {
 		return nil, err
 	}
 
-	grantType := &GrantType{}
-
-	err = json.Unmarshal(data, grantType)
-
-	if err != nil {
-		return nil, err
-	}
-
-	switch grantType.Name {
+	switch grantType {
 	case "password":
 		passwordGrantSource, err := newPasswordGrantSource(
-			credentialsFilePath,
-			targetAud)
+			options.CredentialsFile,
+			options.TargetAudience)
 
 		if err != nil {
 			return nil, errors.Wrap(err, "creation of password grant source failed")
@@ -231,8 +258,8 @@ func getTokenSource(credentialsFilePath string, targetAud string) (idTokenSource
 		return passwordGrantSource, nil
 	default:
 		serviceAccountSource, err := newServiceAccountSource(
-			credentialsFilePath,
-			targetAud)
+			options.CredentialsFile,
+			options.TargetAudience)
 
 		if err != nil {
 			return nil, errors.Wrap(err, "creation of service account source failed")
