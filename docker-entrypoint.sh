@@ -177,6 +177,7 @@ ARGS="$ARGS --bootstrap-server-mapping=${KAFKA_PROXY_BOOTSTRAP_SERVERS},${KAFKA_
 # Dynamic listener ports
 [ -n "$KAFKA_PROXY_DYNAMIC_SEQUENTIAL_MIN_PORT" ] && ARGS="$ARGS --dynamic-sequential-min-port=${KAFKA_PROXY_DYNAMIC_SEQUENTIAL_MIN_PORT}"
 [ -n "$KAFKA_PROXY_DYNAMIC_SEQUENTIAL_MAX_PORTS" ] && ARGS="$ARGS --dynamic-sequential-max-ports=${KAFKA_PROXY_DYNAMIC_SEQUENTIAL_MAX_PORTS}"
+[ -n "$KAFKA_PROXY_DYNAMIC_ADVERTISED_LISTENER" ] && ARGS="$ARGS --dynamic-advertised-listener=${KAFKA_PROXY_DYNAMIC_ADVERTISED_LISTENER}"
 
 # Dial address mapping (redirect broker addresses, e.g. for K8s)
 if [ -n "$KAFKA_PROXY_DIAL_ADDRESS_MAPPING" ]; then
