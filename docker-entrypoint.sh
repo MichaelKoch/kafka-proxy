@@ -9,14 +9,44 @@ render_schema_registry_nginx_config() {
         > /etc/nginx/http.d/schema-registry.conf
 }
 
+resolve_schema_registry_oidc_config() {
+    export SCHEMA_REGISTRY_OIDC_GRANT_TYPE="${SCHEMA_REGISTRY_OIDC_GRANT_TYPE:-${KAFKA_PROXY_SASL_OIDC_GRANT_TYPE:-client_credentials}}"
+    export SCHEMA_REGISTRY_OIDC_CLIENT_ID="${SCHEMA_REGISTRY_OIDC_CLIENT_ID:-$KAFKA_PROXY_SASL_OIDC_CLIENT_ID}"
+    export SCHEMA_REGISTRY_OIDC_CLIENT_SECRET="${SCHEMA_REGISTRY_OIDC_CLIENT_SECRET:-$KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET}"
+    export SCHEMA_REGISTRY_OIDC_TOKEN_URL="${SCHEMA_REGISTRY_OIDC_TOKEN_URL:-$KAFKA_PROXY_SASL_OIDC_TOKEN_URL}"
+    export SCHEMA_REGISTRY_OIDC_SCOPES="${SCHEMA_REGISTRY_OIDC_SCOPES:-$KAFKA_PROXY_SASL_OIDC_SCOPES}"
+    export SCHEMA_REGISTRY_OIDC_USERNAME="${SCHEMA_REGISTRY_OIDC_USERNAME:-$KAFKA_PROXY_SASL_OIDC_USERNAME}"
+    export SCHEMA_REGISTRY_OIDC_PASSWORD="${SCHEMA_REGISTRY_OIDC_PASSWORD:-$KAFKA_PROXY_SASL_OIDC_PASSWORD}"
+}
+
+schema_registry_oidc_is_configured() {
+    case "$SCHEMA_REGISTRY_OIDC_GRANT_TYPE" in
+        client_credentials)
+            [ -n "$SCHEMA_REGISTRY_OIDC_CLIENT_ID" ] && [ -n "$SCHEMA_REGISTRY_OIDC_CLIENT_SECRET" ] && [ -n "$SCHEMA_REGISTRY_OIDC_TOKEN_URL" ]
+            ;;
+        password)
+            [ -n "$SCHEMA_REGISTRY_OIDC_CLIENT_ID" ] && [ -n "$SCHEMA_REGISTRY_OIDC_TOKEN_URL" ] && [ -n "$SCHEMA_REGISTRY_OIDC_USERNAME" ] && [ -n "$SCHEMA_REGISTRY_OIDC_PASSWORD" ]
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 refresh_schema_registry_oidc_token() {
-    scope="${SCHEMA_REGISTRY_OIDC_SCOPES:-$KAFKA_PROXY_SASL_OIDC_SCOPES}"
-    token_response=$(curl -sS -X POST "$KAFKA_PROXY_SASL_OIDC_TOKEN_URL" \
-        -H "Content-Type: application/x-www-form-urlencoded" \
-        --data-urlencode "grant_type=client_credentials" \
-        --data-urlencode "client_id=$KAFKA_PROXY_SASL_OIDC_CLIENT_ID" \
-        --data-urlencode "client_secret=$KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET" \
-        --data-urlencode "scope=$scope")
+    token_response=$(
+        set -- -sS -X POST "$SCHEMA_REGISTRY_OIDC_TOKEN_URL" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "grant_type=$SCHEMA_REGISTRY_OIDC_GRANT_TYPE" \
+            --data-urlencode "client_id=$SCHEMA_REGISTRY_OIDC_CLIENT_ID"
+
+        [ -n "$SCHEMA_REGISTRY_OIDC_CLIENT_SECRET" ] && set -- "$@" --data-urlencode "client_secret=$SCHEMA_REGISTRY_OIDC_CLIENT_SECRET"
+        [ -n "$SCHEMA_REGISTRY_OIDC_SCOPES" ] && set -- "$@" --data-urlencode "scope=$SCHEMA_REGISTRY_OIDC_SCOPES"
+        [ -n "$SCHEMA_REGISTRY_OIDC_USERNAME" ] && set -- "$@" --data-urlencode "username=$SCHEMA_REGISTRY_OIDC_USERNAME"
+        [ -n "$SCHEMA_REGISTRY_OIDC_PASSWORD" ] && set -- "$@" --data-urlencode "password=$SCHEMA_REGISTRY_OIDC_PASSWORD"
+
+        curl "$@"
+    )
 
     access_token=$(echo "$token_response" | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
     if [ -z "$access_token" ]; then
@@ -64,11 +94,14 @@ if [ -n "$SCHEMA_REGISTRY_UPSTREAM" ]; then
     export SCHEMA_REGISTRY_HOST=$(echo "$SCHEMA_REGISTRY_UPSTREAM" | sed 's|https\?://||')
     export SCHEMA_REGISTRY_LOGICAL_CLUSTER="${SCHEMA_REGISTRY_LOGICAL_CLUSTER:-$KAFKA_PROXY_SASL_OAUTH_LOGICAL_CLUSTER}"
     export SCHEMA_REGISTRY_IDENTITY_POOL_ID="${SCHEMA_REGISTRY_IDENTITY_POOL_ID:-$KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID}"
+    SCHEMA_REGISTRY_OIDC_ENABLED=false
+    resolve_schema_registry_oidc_config
 
-    if [ -n "$KAFKA_PROXY_SASL_OIDC_CLIENT_ID" ] && [ -n "$KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET" ] && [ -n "$KAFKA_PROXY_SASL_OIDC_TOKEN_URL" ]; then
+    if schema_registry_oidc_is_configured; then
         if ! refresh_schema_registry_oidc_token; then
             exit 1
         fi
+        SCHEMA_REGISTRY_OIDC_ENABLED=true
         echo "Using OIDC bearer token for Schema Registry proxy authentication"
     elif [ -n "$SCHEMA_REGISTRY_API_KEY" ] && [ -n "$SCHEMA_REGISTRY_API_SECRET" ]; then
         schema_registry_basic_auth=$(printf '%s:%s' "$SCHEMA_REGISTRY_API_KEY" "$SCHEMA_REGISTRY_API_SECRET" | base64 | tr -d '\n')
@@ -76,6 +109,7 @@ if [ -n "$SCHEMA_REGISTRY_UPSTREAM" ]; then
         echo "Using Basic auth for Schema Registry proxy authentication"
     else
         echo "ERROR: Schema Registry auth not configured. Set OIDC env vars or SCHEMA_REGISTRY_API_KEY/SCHEMA_REGISTRY_API_SECRET"
+        echo "OIDC expects SCHEMA_REGISTRY_OIDC_* values (or falls back to KAFKA_PROXY_SASL_OIDC_*)"
         exit 1
     fi
 
@@ -85,7 +119,7 @@ if [ -n "$SCHEMA_REGISTRY_UPSTREAM" ]; then
     echo "Starting nginx Schema Registry proxy -> $SCHEMA_REGISTRY_UPSTREAM on :8081"
     nginx
 
-    if [ -n "$KAFKA_PROXY_SASL_OIDC_CLIENT_ID" ] && [ -n "$KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET" ] && [ -n "$KAFKA_PROXY_SASL_OIDC_TOKEN_URL" ]; then
+    if [ "$SCHEMA_REGISTRY_OIDC_ENABLED" = "true" ]; then
         start_schema_registry_oidc_refresh_loop &
     fi
 fi

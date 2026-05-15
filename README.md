@@ -117,7 +117,13 @@ kcat -b localhost:9092 -L               # list topics
 | `KAFKA_PROXY_HTTP_HEALTH_PATH` | no | `/health` | Health endpoint path |
 | `KAFKA_PROXY_HTTP_METRICS_PATH` | no | `/metrics` | Prometheus metrics endpoint path |
 | `SCHEMA_REGISTRY_UPSTREAM` | no | — | Schema Registry URL (enables nginx proxy on :8081) |
+| `SCHEMA_REGISTRY_OIDC_GRANT_TYPE` | no | falls back to `KAFKA_PROXY_SASL_OIDC_GRANT_TYPE` (or `client_credentials`) | OIDC grant type for Schema Registry token acquisition (`client_credentials` or `password`) |
+| `SCHEMA_REGISTRY_OIDC_CLIENT_ID` | no | falls back to `KAFKA_PROXY_SASL_OIDC_CLIENT_ID` | OIDC client ID used for Schema Registry token acquisition |
+| `SCHEMA_REGISTRY_OIDC_CLIENT_SECRET` | no | falls back to `KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET` | OIDC client secret for Schema Registry (required for `client_credentials`) |
+| `SCHEMA_REGISTRY_OIDC_TOKEN_URL` | no | falls back to `KAFKA_PROXY_SASL_OIDC_TOKEN_URL` | OIDC token endpoint URL for Schema Registry |
 | `SCHEMA_REGISTRY_OIDC_SCOPES` | no | falls back to `KAFKA_PROXY_SASL_OIDC_SCOPES` | OIDC scopes used for Schema Registry token acquisition |
+| `SCHEMA_REGISTRY_OIDC_USERNAME` | no | falls back to `KAFKA_PROXY_SASL_OIDC_USERNAME` | OIDC username for Schema Registry when `SCHEMA_REGISTRY_OIDC_GRANT_TYPE=password` |
+| `SCHEMA_REGISTRY_OIDC_PASSWORD` | no | falls back to `KAFKA_PROXY_SASL_OIDC_PASSWORD` | OIDC password for Schema Registry when `SCHEMA_REGISTRY_OIDC_GRANT_TYPE=password` |
 | `SCHEMA_REGISTRY_LOGICAL_CLUSTER` | no | falls back to `KAFKA_PROXY_SASL_OAUTH_LOGICAL_CLUSTER` | Schema Registry logical cluster header (`target-sr-cluster`, should be `lsrc-...` or `lscc-...`) |
 | `SCHEMA_REGISTRY_IDENTITY_POOL_ID` | no | falls back to `KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID` | Schema Registry identity pool header (`Confluent-Identity-Pool-Id`) |
 | Schema Registry OIDC refresh | n/a | automatic | Token refresh is automatic when OIDC env vars are configured; nginx is reloaded after refresh |
@@ -146,6 +152,11 @@ KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID=<pool-...>
 # Schema Registry (optional — enables nginx reverse proxy on :8081)
 SCHEMA_REGISTRY_UPSTREAM=https://psrc-xxxxx.eu-central-1.aws.confluent.cloud
 SCHEMA_REGISTRY_LOGICAL_CLUSTER=<lsrc-...>
+# Optional: use dedicated Schema Registry OIDC config
+# SCHEMA_REGISTRY_OIDC_GRANT_TYPE=client_credentials
+# SCHEMA_REGISTRY_OIDC_CLIENT_ID=<sr-client-id>
+# SCHEMA_REGISTRY_OIDC_CLIENT_SECRET=<sr-client-secret>
+# SCHEMA_REGISTRY_OIDC_TOKEN_URL=https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
 # Optional override, defaults to KAFKA_PROXY_SASL_OIDC_SCOPES
 SCHEMA_REGISTRY_OIDC_SCOPES=api://<resource-app-id>/.default
 
