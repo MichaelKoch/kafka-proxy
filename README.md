@@ -40,6 +40,10 @@ The entrypoint script (`docker-entrypoint.sh`) reads environment variables and t
 into the appropriate `kafka-proxy server` CLI flags. If Schema Registry variables are set,
 an nginx reverse proxy is started automatically on port 8081.
 
+When Schema Registry uses OIDC client credentials, the container also refreshes the bearer token
+automatically and reloads nginx in place. Refresh is scheduled at roughly half of the token
+`expires_in` value (minimum 30 seconds between refresh attempts).
+
 **1. Create a `.env` file** with the required Kafka connection settings.
 
 For Confluent Cloud API key/secret (SASL/PLAIN):
@@ -116,6 +120,7 @@ kcat -b localhost:9092 -L               # list topics
 | `SCHEMA_REGISTRY_OIDC_SCOPES` | no | falls back to `KAFKA_PROXY_SASL_OIDC_SCOPES` | OIDC scopes used for Schema Registry token acquisition |
 | `SCHEMA_REGISTRY_LOGICAL_CLUSTER` | no | falls back to `KAFKA_PROXY_SASL_OAUTH_LOGICAL_CLUSTER` | Schema Registry logical cluster header (`target-sr-cluster`, should be `lsrc-...` or `lscc-...`) |
 | `SCHEMA_REGISTRY_IDENTITY_POOL_ID` | no | falls back to `KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID` | Schema Registry identity pool header (`Confluent-Identity-Pool-Id`) |
+| Schema Registry OIDC refresh | n/a | automatic | Token refresh is automatic when OIDC env vars are configured; nginx is reloaded after refresh |
 | `SCHEMA_REGISTRY_API_KEY` | no | — | Schema Registry API key |
 | `SCHEMA_REGISTRY_API_SECRET` | no | — | Schema Registry API secret |
 
