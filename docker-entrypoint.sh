@@ -3,6 +3,61 @@ set -e
 
 PROXY_BIN="/opt/kafka-proxy/bin/kafka-proxy"
 
+render_schema_registry_nginx_config() {
+    envsubst '${SCHEMA_REGISTRY_UPSTREAM} ${SCHEMA_REGISTRY_HOST} ${SCHEMA_REGISTRY_AUTH_HEADER} ${SCHEMA_REGISTRY_LOGICAL_CLUSTER} ${SCHEMA_REGISTRY_IDENTITY_POOL_ID}' \
+        < /etc/nginx/templates/schema-registry.conf.template \
+        > /etc/nginx/http.d/schema-registry.conf
+}
+
+refresh_schema_registry_oidc_token() {
+    scope="${SCHEMA_REGISTRY_OIDC_SCOPES:-$KAFKA_PROXY_SASL_OIDC_SCOPES}"
+    token_response=$(curl -sS -X POST "$KAFKA_PROXY_SASL_OIDC_TOKEN_URL" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        --data-urlencode "grant_type=client_credentials" \
+        --data-urlencode "client_id=$KAFKA_PROXY_SASL_OIDC_CLIENT_ID" \
+        --data-urlencode "client_secret=$KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET" \
+        --data-urlencode "scope=$scope")
+
+    access_token=$(echo "$token_response" | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+    if [ -z "$access_token" ]; then
+        echo "ERROR: failed to acquire OIDC access token for Schema Registry"
+        echo "$token_response"
+        return 1
+    fi
+
+    expires_in=$(echo "$token_response" | sed -n 's/.*"expires_in"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
+    if [ -z "$expires_in" ]; then
+        expires_in=3600
+    fi
+
+    SCHEMA_REGISTRY_OIDC_REFRESH_SECONDS=$((expires_in / 2))
+    if [ "$SCHEMA_REGISTRY_OIDC_REFRESH_SECONDS" -lt 30 ]; then
+        SCHEMA_REGISTRY_OIDC_REFRESH_SECONDS=30
+    fi
+
+    export SCHEMA_REGISTRY_AUTH_HEADER="Bearer $access_token"
+    export SCHEMA_REGISTRY_OIDC_REFRESH_SECONDS
+    return 0
+}
+
+start_schema_registry_oidc_refresh_loop() {
+    while true; do
+        sleep "$SCHEMA_REGISTRY_OIDC_REFRESH_SECONDS"
+
+        if refresh_schema_registry_oidc_token; then
+            render_schema_registry_nginx_config
+            if nginx -s reload; then
+                echo "Refreshed Schema Registry OIDC token and reloaded nginx"
+            else
+                echo "WARNING: failed to reload nginx after Schema Registry token refresh"
+            fi
+        else
+            echo "WARNING: Schema Registry OIDC token refresh failed; retrying in 30s"
+            SCHEMA_REGISTRY_OIDC_REFRESH_SECONDS=30
+        fi
+    done
+}
+
 # --- Schema Registry nginx proxy ---
 if [ -n "$SCHEMA_REGISTRY_UPSTREAM" ]; then
     # Extract host from URL
@@ -11,22 +66,9 @@ if [ -n "$SCHEMA_REGISTRY_UPSTREAM" ]; then
     export SCHEMA_REGISTRY_IDENTITY_POOL_ID="${SCHEMA_REGISTRY_IDENTITY_POOL_ID:-$KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID}"
 
     if [ -n "$KAFKA_PROXY_SASL_OIDC_CLIENT_ID" ] && [ -n "$KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET" ] && [ -n "$KAFKA_PROXY_SASL_OIDC_TOKEN_URL" ]; then
-        scope="${SCHEMA_REGISTRY_OIDC_SCOPES:-$KAFKA_PROXY_SASL_OIDC_SCOPES}"
-        token_response=$(curl -sS -X POST "$KAFKA_PROXY_SASL_OIDC_TOKEN_URL" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            --data-urlencode "grant_type=client_credentials" \
-            --data-urlencode "client_id=$KAFKA_PROXY_SASL_OIDC_CLIENT_ID" \
-            --data-urlencode "client_secret=$KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET" \
-            --data-urlencode "scope=$scope")
-
-        access_token=$(echo "$token_response" | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-        if [ -z "$access_token" ]; then
-            echo "ERROR: failed to acquire OIDC access token for Schema Registry"
-            echo "$token_response"
+        if ! refresh_schema_registry_oidc_token; then
             exit 1
         fi
-
-        export SCHEMA_REGISTRY_AUTH_HEADER="Bearer $access_token"
         echo "Using OIDC bearer token for Schema Registry proxy authentication"
     elif [ -n "$SCHEMA_REGISTRY_API_KEY" ] && [ -n "$SCHEMA_REGISTRY_API_SECRET" ]; then
         schema_registry_basic_auth=$(printf '%s:%s' "$SCHEMA_REGISTRY_API_KEY" "$SCHEMA_REGISTRY_API_SECRET" | base64 | tr -d '\n')
@@ -38,12 +80,14 @@ if [ -n "$SCHEMA_REGISTRY_UPSTREAM" ]; then
     fi
 
     # Render nginx config from template (only substitute our vars, not nginx vars)
-    envsubst '${SCHEMA_REGISTRY_UPSTREAM} ${SCHEMA_REGISTRY_HOST} ${SCHEMA_REGISTRY_AUTH_HEADER} ${SCHEMA_REGISTRY_LOGICAL_CLUSTER} ${SCHEMA_REGISTRY_IDENTITY_POOL_ID}' \
-        < /etc/nginx/templates/schema-registry.conf.template \
-        > /etc/nginx/http.d/schema-registry.conf
+    render_schema_registry_nginx_config
 
     echo "Starting nginx Schema Registry proxy -> $SCHEMA_REGISTRY_UPSTREAM on :8081"
     nginx
+
+    if [ -n "$KAFKA_PROXY_SASL_OIDC_CLIENT_ID" ] && [ -n "$KAFKA_PROXY_SASL_OIDC_CLIENT_SECRET" ] && [ -n "$KAFKA_PROXY_SASL_OIDC_TOKEN_URL" ]; then
+        start_schema_registry_oidc_refresh_loop &
+    fi
 fi
 
 # --- Kafka Proxy ---
