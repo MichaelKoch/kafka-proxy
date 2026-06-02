@@ -11,12 +11,14 @@ for clients to handle TLS/SASL authentication directly.
 |-----------------------|---------------|-----------|--------------------------------------------------|
 | Kafka Proxy           | 9092          | Kafka TCP | Proxies to Confluent Cloud Kafka brokers          |
 | Schema Registry Proxy | 8081          | HTTP      | Reverse-proxies Confluent Schema Registry (nginx) |
+| Blob Storage Proxy    | 8082          | HTTP      | Reverse-proxies Azure Blob Storage (nginx)        |
 | Health / Metrics      | 8000          | HTTP      | Health check and Prometheus metrics               |
 
 ## Endpoints
 
 - **Kafka bootstrap**: `localhost:9092` (plaintext, no auth needed)
 - **Schema Registry**: `http://localhost:8081` (no auth needed, nginx injects credentials)
+- **Blob Storage**: `http://localhost:8082` (no auth needed, nginx appends SAS token)
 - **Health check**: `http://localhost:8000/health` → returns `OK`
 - **Metrics**: `http://localhost:8000/metrics` → Prometheus format
 
@@ -71,6 +73,16 @@ curl -s http://localhost:8081/subjects
 curl -s http://localhost:8081/subjects/{subject}/versions/latest
 ```
 
+### Blob Storage — list container blobs
+```bash
+curl -s "http://localhost:8082/<container>?restype=container&comp=list"
+```
+
+### Blob Storage — download a blob
+```bash
+curl -fL "http://localhost:8082/<container>/<blob-path>" -o blob.out
+```
+
 ### Health check
 ```bash
 curl -s http://localhost:8000/health
@@ -104,6 +116,9 @@ curl -s http://localhost:8000/health
 | SCHEMA_REGISTRY_IDENTITY_POOL_ID  | no       |               | Schema Registry identity pool header        |
 | SCHEMA_REGISTRY_API_KEY           | no       |               | Schema Registry API key                    |
 | SCHEMA_REGISTRY_API_SECRET        | no       |               | Schema Registry API secret                 |
+| BLOB_STORAGE_LISTEN_PORT          | no       | 8082          | Local listen port for Blob Storage nginx proxy |
+| BLOB_STORAGE_ACCOUNT              | no       |               | Azure Storage account name (without domain) |
+| BLOB_STORAGE_SAS_TOKEN            | no       |               | SAS token used when forwarding requests (with or without leading `?`) |
 
 ## Docker Run
 
@@ -112,7 +127,7 @@ curl -s http://localhost:8000/health
 docker run -d --name kafka-proxy --network host --env-file .env kafka-proxy
 
 # With port mapping (bootstrap only, dynamic broker ports won't work for some clients):
-docker run -d --name kafka-proxy -p 9092:9092 -p 8000:8000 -p 8081:8081 --env-file .env kafka-proxy
+docker run -d --name kafka-proxy -p 9092:9092 -p 8000:8000 -p 8081:8081 -p 8082:8082 --env-file .env kafka-proxy
 ```
 
 ## Retrieve This File

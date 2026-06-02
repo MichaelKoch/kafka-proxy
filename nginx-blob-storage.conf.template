@@ -1,0 +1,70 @@
+# Merge client query parameters with the SAS token.
+#
+# Example:
+#   /container/blob.txt
+#     -> ?<sas>
+#
+#   /container/blob.txt?foo=bar
+#     -> ?foo=bar&<sas>
+map $args $upstream_args {
+    ""      "${BLOB_STORAGE_SAS_TOKEN}";
+    default "$args&${BLOB_STORAGE_SAS_TOKEN}";
+}
+
+server {
+    listen ${BLOB_STORAGE_LISTEN_PORT};
+    server_name _;
+
+    resolver 127.0.0.11 valid=30s ipv6=off;
+
+    access_log /var/log/nginx/blob-access.log;
+    error_log  /var/log/nginx/blob-error.log warn;
+
+    client_max_body_size 0;
+
+    location / {
+        # Azure Blob endpoint
+        set $blob_host ${BLOB_STORAGE_ACCOUNT}.blob.core.windows.net;
+
+        # TLS/SNI
+        proxy_ssl_server_name on;
+        proxy_ssl_name $blob_host;
+
+        # Preserve Azure host header
+        proxy_set_header Host $blob_host;
+
+        # Forward useful request headers
+        proxy_set_header Range $http_range;
+        proxy_set_header If-Match $http_if_match;
+        proxy_set_header If-None-Match $http_if_none_match;
+        proxy_set_header If-Modified-Since $http_if_modified_since;
+        proxy_set_header If-Unmodified-Since $http_if_unmodified_since;
+
+        # Forward client information
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Real-IP $remote_addr;
+
+        # Streaming for large blobs
+        proxy_buffering off;
+        proxy_request_buffering off;
+
+        # Timeouts
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        # Preserve response headers from Azure
+        proxy_pass_header ETag;
+        proxy_pass_header Last-Modified;
+        proxy_pass_header Content-Range;
+        proxy_pass_header Content-Disposition;
+        proxy_pass_header Content-Encoding;
+        proxy_pass_header x-ms-request-id;
+        proxy_pass_header x-ms-version;
+        proxy_pass_header x-ms-blob-type;
+
+        # Proxy request
+        proxy_pass https://$blob_host$uri?$upstream_args;
+    }
+}

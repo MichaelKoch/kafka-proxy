@@ -39,6 +39,8 @@ The Docker image is designed to be configured entirely via environment variables
 The entrypoint script (`docker-entrypoint.sh`) reads environment variables and translates them
 into the appropriate `kafka-proxy server` CLI flags. If Schema Registry variables are set,
 an nginx reverse proxy is started automatically on port 8081.
+If Blob Storage variables are set, an nginx reverse proxy is also started on port 8082
+(or `BLOB_STORAGE_LISTEN_PORT` when overridden).
 
 When Schema Registry uses OIDC client credentials, the container also refreshes the bearer token
 automatically and reloads nginx in place. Refresh is scheduled at roughly half of the token
@@ -79,7 +81,7 @@ KAFKA_PROXY_SASL_OAUTH_IDENTITY_POOL_ID=<pool-...>
 docker run -d --name kafka-proxy --network host --env-file .env ghcr.io/michaelkoch/kproxy:master
 
 # Or with explicit port mapping:
-docker run -d --name kafka-proxy -p 9092:9092 -p 8000:8000 -p 8081:8081 --env-file .env ghcr.io/michaelkoch/kproxy:master
+docker run -d --name kafka-proxy -p 9092:9092 -p 8000:8000 -p 8081:8081 -p 8082:8082 --env-file .env ghcr.io/michaelkoch/kproxy:master
 ```
 
 **3. Verify** the proxy is running:
@@ -129,6 +131,9 @@ kcat -b localhost:9092 -L               # list topics
 | Schema Registry OIDC refresh | n/a | automatic | Token refresh is automatic when OIDC env vars are configured; nginx is reloaded after refresh |
 | `SCHEMA_REGISTRY_API_KEY` | no | — | Schema Registry API key |
 | `SCHEMA_REGISTRY_API_SECRET` | no | — | Schema Registry API secret |
+| `BLOB_STORAGE_LISTEN_PORT` | no | `8082` | Local listen port for Blob Storage nginx proxy |
+| `BLOB_STORAGE_ACCOUNT` | no | — | Azure Storage account name (without domain) |
+| `BLOB_STORAGE_SAS_TOKEN` | no | — | SAS token used when forwarding blob requests (with or without leading `?`) |
 
 #### `.env` file example (full)
 
@@ -164,6 +169,12 @@ SCHEMA_REGISTRY_OIDC_SCOPES=api://<resource-app-id>/.default
 # SCHEMA_REGISTRY_API_KEY=...
 # SCHEMA_REGISTRY_API_SECRET=...
 
+# Azure Blob Storage proxy (optional - enables nginx reverse proxy on :8082)
+BLOB_STORAGE_LISTEN_PORT=8082
+BLOB_STORAGE_ACCOUNT=<storage-account-name>
+# Can be set with or without leading '?'
+BLOB_STORAGE_SAS_TOKEN=sv=2025-01-05&ss=b&srt=sco&sp=rl&se=2026-12-31T23:59:59Z&st=2026-01-01T00:00:00Z&spr=https&sig=<signature>
+
 # Optional tuning
 KAFKA_PROXY_LOG_LEVEL=info
 ```
@@ -174,9 +185,35 @@ KAFKA_PROXY_LOG_LEVEL=info
 |---|---|---|---|
 | Kafka Proxy | 9092 | Kafka TCP | Plaintext Kafka — TLS/SASL handled by proxy |
 | Schema Registry Proxy | 8081 | HTTP | Reverse-proxies Confluent Schema Registry (nginx) |
+| Blob Storage Proxy | 8082 | HTTP | Reverse-proxies Azure Blob Storage and appends SAS token |
 | Health / Metrics | 8000 | HTTP | `/health` and `/metrics` endpoints |
 
 Clients connect via plaintext — no SASL credentials or TLS configuration needed on the client side.
+
+#### Blob Storage proxy behavior
+
+When `BLOB_STORAGE_ACCOUNT` and `BLOB_STORAGE_SAS_TOKEN` are configured, requests to
+`http://localhost:${BLOB_STORAGE_LISTEN_PORT}` are proxied to:
+
+- `https://<account>.blob.core.windows.net/<path>`
+
+Query parameter merge behavior:
+
+- `/container/blob.txt` -> `?<sas-token>`
+- `/container/blob.txt?foo=bar` -> `?foo=bar&<sas-token>`
+
+Example calls:
+
+```bash
+# List blobs in a container (if SAS has list permissions)
+curl -s "http://localhost:8082/my-container?restype=container&comp=list"
+
+# Download a blob
+curl -fL "http://localhost:8082/my-container/path/to/blob.txt" -o blob.txt
+
+# Range read
+curl -H "Range: bytes=0-1023" -i "http://localhost:8082/my-container/path/to/blob.txt"
+```
 
 #### Building a local Docker image
 

@@ -2,6 +2,20 @@
 set -e
 
 PROXY_BIN="/opt/kafka-proxy/bin/kafka-proxy"
+NGINX_STARTED=false
+
+render_blob_storage_nginx_config() {
+    envsubst '${BLOB_STORAGE_LISTEN_PORT} ${BLOB_STORAGE_ACCOUNT} ${BLOB_STORAGE_SAS_TOKEN}' \
+        < /etc/nginx/templates/blob-storage.conf.template \
+        > /etc/nginx/http.d/blob-storage.conf
+}
+
+start_nginx_if_needed() {
+    if [ "$NGINX_STARTED" != "true" ]; then
+        nginx
+        NGINX_STARTED=true
+    fi
+}
 
 render_schema_registry_nginx_config() {
     envsubst '${SCHEMA_REGISTRY_UPSTREAM} ${SCHEMA_REGISTRY_HOST} ${SCHEMA_REGISTRY_AUTH_HEADER} ${SCHEMA_REGISTRY_LOGICAL_CLUSTER} ${SCHEMA_REGISTRY_IDENTITY_POOL_ID}' \
@@ -117,11 +131,27 @@ if [ -n "$SCHEMA_REGISTRY_UPSTREAM" ]; then
     render_schema_registry_nginx_config
 
     echo "Starting nginx Schema Registry proxy -> $SCHEMA_REGISTRY_UPSTREAM on :8081"
-    nginx
+    start_nginx_if_needed
 
     if [ "$SCHEMA_REGISTRY_OIDC_ENABLED" = "true" ]; then
         start_schema_registry_oidc_refresh_loop &
     fi
+fi
+
+# --- Azure Blob Storage nginx proxy ---
+if [ -n "$BLOB_STORAGE_ACCOUNT" ] && [ -n "$BLOB_STORAGE_SAS_TOKEN" ]; then
+    export BLOB_STORAGE_LISTEN_PORT="${BLOB_STORAGE_LISTEN_PORT:-8082}"
+
+    # Normalize to query-string fragment without leading '?'
+    export BLOB_STORAGE_SAS_TOKEN=$(printf '%s' "$BLOB_STORAGE_SAS_TOKEN" | sed 's/^?//')
+
+    render_blob_storage_nginx_config
+
+    echo "Starting nginx Blob Storage proxy -> https://${BLOB_STORAGE_ACCOUNT}.blob.core.windows.net on :${BLOB_STORAGE_LISTEN_PORT}"
+    start_nginx_if_needed
+elif [ -n "$BLOB_STORAGE_ACCOUNT" ] || [ -n "$BLOB_STORAGE_SAS_TOKEN" ]; then
+    echo "ERROR: Blob Storage proxy requires both BLOB_STORAGE_ACCOUNT and BLOB_STORAGE_SAS_TOKEN"
+    exit 1
 fi
 
 # --- Kafka Proxy ---

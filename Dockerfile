@@ -35,6 +35,7 @@ RUN setcap 'cap_net_bind_service=+ep' /opt/kafka-proxy/bin/kafka-proxy && \
 
 # Nginx Schema Registry proxy template
 COPY nginx-schema-registry.conf.template /etc/nginx/templates/schema-registry.conf.template
+COPY nginx-blob-storage.conf.template /etc/nginx/templates/blob-storage.conf.template
 COPY docker-entrypoint.sh /opt/kafka-proxy/bin/docker-entrypoint.sh
 COPY SKILL.md /opt/kafka-proxy/SKILL.md
 RUN chmod +x /opt/kafka-proxy/bin/docker-entrypoint.sh && \
@@ -54,8 +55,10 @@ ENV KAFKA_PROXY_BOOTSTRAP_SERVERS="" \
     KAFKA_PROXY_SASL_ENABLE="true" \
     KAFKA_PROXY_SASL_METHOD="PLAIN" \
     KAFKA_PROXY_LISTENER_TLS_ENABLE="false" \
-    SCHEMA_REGISTRY_UPSTREAM=""
+    SCHEMA_REGISTRY_UPSTREAM="" \
+    BLOB_STORAGE_LISTEN_PORT="8082" \
+    BLOB_STORAGE_ACCOUNT=""
 
-EXPOSE 9092 8000 8081
+EXPOSE 9092 8000 8081 8082
 
 ENTRYPOINT ["/opt/kafka-proxy/bin/docker-entrypoint.sh"]
